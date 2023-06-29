@@ -5,7 +5,7 @@ integrations:
     enabled: false
 
 metrics:
-  wal_directory: /tmp/wal
+  wal_directory: /etc/grafana-agent/data
   configs:
     - name: supa_prom_scraper
       scrape_configs:
