@@ -1,0 +1,27 @@
+integrations:
+  agent:
+    enabled: false
+  node_exporter:
+    enabled: false
+
+metrics:
+  wal_directory: /tmp/wal
+  global:
+    scrape_interval: 5s
+  configs:
+    - name: supa_prom_scraper
+      scrape_configs:
+        - job_name: supa_prom_scraper
+          metrics_path: "/customer/v1/privileged/metrics"
+          basic_auth:
+            username: service_role
+            password: ${SUPABASESERVICEROLESECRET}
+          static_configs:
+            - targets: [${SUPABASEPROJECTURL}]
+
+      remote_write:
+        # See https://prometheus.io/docs/prometheus/2.42/configuration/configuration/#remote_write
+        - url: ${AMPREMOTEWRITEURL}
+          sigv4:
+            region: ${AWSREGION}
+            role_arn: ${AWSROLEARN}
