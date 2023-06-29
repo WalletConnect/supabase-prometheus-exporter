@@ -1,6 +1,6 @@
 FROM grafana/agent
 
-COPY agent.yaml /etc/agent/
+COPY agent.yaml /etc/grafana-agent/
 
 COPY run.sh /run.sh
 
