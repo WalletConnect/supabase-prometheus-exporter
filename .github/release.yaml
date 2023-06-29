@@ -1,0 +1,96 @@
+name: "release"
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - ".github/**"
+      - "README.md"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Cocogitto check
+        id: cocogitto
+        uses: cocogitto/cocogitto-action@v3
+        with:
+          check: true
+          check-latest-tag-only: true
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      # Authenticate with ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Setup Buildkit
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Verify that the image builds successfully
+      - name: Build Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          load: true
+          cache-from: type=gha
+
+      # Prepare github release
+      - name: Cocogitto release
+        id: release
+        uses: cocogitto/cocogitto-action@v3
+        with:
+          check: true
+          check-latest-tag-only: true
+          release: true
+          git-user: "github-actions"
+          git-user-email: "github-actions@github.com"
+
+      # Generate the image tags
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ steps.login-ecr.outputs.registry }}/supabase-prometheus-exporter
+            walletconnect/supabase-prometheus-exporter,enable=false
+          flavor: |
+            latest=auto
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=${{ steps.release.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+
+      # Export the image to Amazon ECR
+      - name: Export Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-to: type=gha,mode=max
+
+      - name: Generate Changelog
+        run: cog changelog --at ${{ steps.release.outputs.version }} -t full_hash > GITHUB_CHANGELOG.md
+
+      - name: Update Github release notes
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: GITHUB_CHANGELOG.md
+          tag_name: ${{ steps.release.outputs.version }}
+          token: ${{ secrets.RELEASE_TOKEN }}
