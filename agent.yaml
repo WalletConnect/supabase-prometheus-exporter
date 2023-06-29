@@ -24,4 +24,3 @@ metrics:
         - url: ${AMPREMOTEWRITEURL}
           sigv4:
             region: ${AWSREGION}
-            role_arn: ${AWSROLEARN}
